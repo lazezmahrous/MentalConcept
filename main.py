@@ -14,7 +14,9 @@ from kivymd.color_definitions import colors
 from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.core.audio import SoundLoader
+import json
 
+# تحويل بيانات اللاعب إلى JSON وحفظها في الملف
 # CustomSnackbar
 class CustomSnackbar(BaseSnackbar):
     text = StringProperty(None)
@@ -22,10 +24,12 @@ class CustomSnackbar(BaseSnackbar):
     font_size = NumericProperty("15sp")
     md_bg_color = 255 , 0 , 12
 # Beginning to define the size of the application
-Window.size = (dp(400), dp(600))
-# application body
+width, height = Window.size # application body
 class App(MDApp):
     def build(self):
+        self.store = JsonStore('data.json')
+        self.score = self.store.get('score')['value'] if self.store.exists('score') else 0
+        self.progressbar = self.store.get('progressbar')['value'] if self.store.exists('progressbar') else 0
         self.theme_cls.theme_style = "Light"
         self.theme_cls.primary_palette = "Yellow"
         self.theme_cls.primary_hue = "800"
@@ -33,20 +37,21 @@ class App(MDApp):
         kv = Builder.load_file("kivy.kv")
         return kv
     # Start Screen
+    # def change_screen_splash(self):
+    #     app = App.get_running_app()
+    #     app.root.current = "Secondwindow"
+    #     sound = SoundLoader.load('sound/startscreen.mp3')
+    #     if sound:
+    #         sound.play()
     def on_start(self):
-        Clock.schedule_once(lambda dt: self.change_screen_splash(), 6)
-    def change_screen_splash(self):
-        app = App.get_running_app()
-        app.root.current = "Secondwindow"
-        sound = SoundLoader.load('sound/startscreen.mp3')
-        if sound:
-            sound.play()
+        self.root.ids.score_lable.text = f"{self.score}"
+        self.root.ids.progressbar.value = int(self.progressbar)
     def home_screen(self):
         app = App.get_running_app()
         app.root.current = "Secondwindow"
     #Start counting
     def start_counting(self):
-        if self.counter_tow >= 2 and self.counter_one >= 0.5:
+        if self.counter_tow >= 2 and self.counter_one >= 0.5 and self.root.ids.counter_label_three.text == "+" or self.root.ids.counter_label_three.text == "-":
             sound = SoundLoader.load('sound/startcount.wav')
             if sound:
                 sound.play()
@@ -61,17 +66,23 @@ class App(MDApp):
         self.numbers = []
         self.sum2 = 0
         self.sum3 = 1
-        for i in range(self.counter_tow + 1):
+        for i in range(self.counter_tow):
             self.sum3 += 1
             self.num = random.randint(-10, 10)
             self.numbers.append(self.num)
             Clock.schedule_once(lambda dt, num=self.num: self.update_number(num), self.counter_one * i)
-            if i >= self.counter_tow :
+            if (i+1) >= self.counter_tow :
                 Clock.schedule_once(lambda dt: self.change_screen(), self.counter_one * (i+1))
         for num in self.numbers:
-            self.sum2 += num
-            self.number_o = str(self.numbers).replace(",", " + ").replace("[", "").replace("]", " = ")
-            print(self.sum2)
+            if self.root.ids.counter_label_three.text == "+":
+                self.sum2 += num
+                self.number_o = str(self.numbers).replace(",", " + ").replace("[", "").replace("]", " = ")
+                print(self.sum2)
+            else:
+                self.sum2 += num
+                self.number_o = str(self.numbers).replace(",", " - ").replace("[", "").replace("]", " = ")
+                print(self.sum2)
+
     #update Number $ Checksum
     def check_sum(self, dt, sum):
         self.root.ids.number_label.text = f"{sum}"
@@ -115,16 +126,12 @@ class App(MDApp):
         self.root.ids.counter_label_tow.text = str(self.counter_tow)
 
     #Button 3
-    counter_three = NumericProperty(0)
+    counter_three = StringProperty()
     def increment_counter_three(self):
-        self.counter_three += 1
-        self.update_counter_label_three()
+        self.root.ids.counter_label_three.text = "+"
+        # self.update_counter_label_three()
     def decrement_counter_three(self):
-        if self.counter_three >=1:
-            self.counter_three -= 1
-        else:
-            exit
-        self.update_counter_label_three()
+        self.root.ids.counter_label_three.text = "-"
     def update_counter_label_three(self):
         self.root.ids.counter_label_three.text = str(self.counter_three)
 
@@ -133,6 +140,7 @@ class App(MDApp):
 
     # progressbar
     progressbar = NumericProperty(0)
+    
 
 # Check answer
     def result_number(self):
@@ -143,15 +151,19 @@ class App(MDApp):
             if self.counter_tow >= 5:
                 self.progressbar += 4
                 self.score += 4
-                self.root.ids.score_lable.text = f"{self.score}"
+                self.root.ids.score_lable.text = f"{str(self.score)}"
+                self.root.ids.slogan.text = "keep a top"
                 self.root.ids.progressbar.value = self.progressbar
-                self.root.ids.slogan.text = "Keep going"
+                self.store.put('progressbar', value=self.progressbar)
+                self.store.put('score', value=self.score)
             else:
                 self.progressbar += 2
                 self.score += 2
-                self.root.ids.score_lable.text = f"{self.score}"
+                self.root.ids.score_lable.text = f"{str(self.score)}"
                 self.root.ids.progressbar.value = self.progressbar
                 self.root.ids.slogan.text = "Keep going"
+                self.store.put('score', value=self.score)
+                self.store.put('progressbar', value=self.progressbar)
             if self.progressbar and self.score >= 100 :
                 sound = SoundLoader.load('sound/extrabonus.wav')
                 if sound:
@@ -167,20 +179,25 @@ class App(MDApp):
                     sound.play()
                 app = App.get_running_app()
                 app.root.current = "happy_window"
+
         else:
             sound = SoundLoader.load('sound/los.wav')
             if sound:
                 sound.play()
             app = App.get_running_app()
             app.root.current = "sad"
+            self.progressbar -= 1
+            self.score -= 1
+            self.root.ids.score_lable.text = f"{str(self.score)}"
+            self.root.ids.progressbar.value = self.progressbar
             self.root.ids.correct_answer.text = f"The correct answer is [{self.o_number}] !"
             self.root.ids.correct_answer_information.text = f"result = [{self.o_number}]"
             self.root.ids.correct_answer_label.text = f"{(self.number_o)}"
 # Warning Message
     def show_warning(self):
         snackbar = CustomSnackbar(
-            text="Please Enter Flash Timeing & Number Of Digits!",
-            font_size=13,
+            text="Please complete the settings !",
+            font_size=15,
             icon="information",
             snackbar_x="10dp",
             snackbar_y="8dp",
@@ -192,5 +209,6 @@ class App(MDApp):
             Window.width - (snackbar.snackbar_x * 2)
         ) / Window.width
         snackbar.open()
+    
 
 App().run()
